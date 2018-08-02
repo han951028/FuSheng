@@ -1,2 +1,0 @@
-@scheduler
-scheduler.com.mossle.domap.Util.MapScheduler.execute=true
