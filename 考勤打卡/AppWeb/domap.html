@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html>
+
+	<head>
+		<meta charset="utf-8">
+		<title>oaDemo</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1,maximum-scale=1,user-scalable=no">
+		<meta name="apple-mobile-web-app-capable" content="yes">
+		<meta name="apple-mobile-web-app-status-bar-style" content="black">
+		<script type="text/javascript">
+			var htmlTag = document.getElementsByTagName("html")[0];
+			htmlTag.style.fontSize = document.documentElement.clientWidth / 10 + "px";
+		</script>
+
+		<!--标准mui.css-->
+		<link rel="stylesheet" href="../css/mui.min.css">
+		<link rel="stylesheet" type="text/css" href="../css/font-awesome.min.css" />
+		<script src="../js/jquery.min.js"></script>
+		<!--App自定义的css-->
+		<!--<link rel="stylesheet" type="text/css" href="../css/app.css" />-->
+		<style>
+			body {
+				background: #fff;
+			}
+			
+			.domapInfo {
+				margin-top: 50px;
+			}
+			
+			.topInfo {
+				border-bottom: 1px solid #ccc;
+				height: 50px;
+			}
+			
+			.userName {
+				font-size: 16px;
+				padding-left: 40px;
+			}
+			
+			.userGroup {
+				color: #BCBEBF;
+				font-size: 16px;
+				padding-left: 40px;
+			}
+			
+			.startInfo {
+				margin-top: 20px;
+				margin-bottom: 40px;
+			}
+			
+			.clickDoMap {
+				margin: auto;
+				text-align: center;
+				line-height: 125px;
+				width: 125px;
+				height: 125px;
+				background-color: dodgerblue;
+				border-radius: 50%;
+				margin-top: 30px;
+				color: white;
+				box-shadow: 0px 0px 15px rgba(0, 0, 0, 0.4);
+			}
+			
+			.clickStatus {
+				text-align: center;
+				font-size: 14px;
+			}
+			
+			.domapTime {
+				color: #666;
+				font-size: 16px;
+				margin: 5px, 0px;
+				margin-top: 10px;
+				text-indent: 10%;
+			}
+			
+			.domapSite {
+				color: #666;
+				font-size: 14px;
+				margin: 5px, 0px;
+				margin-top: 10px;
+				padding-left: 10%;
+			}
+			
+			.domapWorkTime {
+				font-weight: bold;
+				color: #000000;
+				font-size: 18px;
+				margin-top: 3%;
+				text-indent: 10%;
+			}
+			
+			.map {
+				background-color: #000000;
+			}
+		</style>
+	</head>
+
+	<body>
+		<header class="mui-bar mui-bar-nav" style="background: #207CD1;color: #fff;">
+			<a class="mui-action-back mui-icon mui-icon-left-nav mui-pull-left" style="color: #fff;"></a>
+			<h1 class="mui-title" style="color: #fff;">我的打卡</h1>
+		</header>
+		<div id="domapInfo" class="domapInfo">
+			<div class="topInfo">
+				<div id="userName" class="userName"></div>
+				<div id="userGroup" class="userGroup"></div>
+			</div>
+			<div class="contentInfo">
+				<div id="sleep" class="domapTime">
+
+				</div>
+				<div class="startInfo">
+					<div id="startTime" class="domapTime"> </div>
+					<div id="startWorkTime" class="domapWorkTime"></div>
+					<div id="startSite" class="domapSite"></div>
+					<div id="startDomap">
+
+					</div>
+				</div>
+				<div id="endInfo">
+					<div id="endTime" class="domapTime"></div>
+					<div id="endWorkTime" class="domapWorkTime"></div>
+					<div id="endSite" class="domapSite"></div>
+					<div id="endDomap">
+
+					</div>
+				</div>
+				<div id="domap" class="domapInfo">
+					<div id="">
+						<div id="clickStatus" class="clickStatus">
+						</div>
+
+					</div>
+
+				</div>
+			</div>
+			<div class="bottomInfo">
+
+			</div>
+
+		</div>
+		<div id="map" class="map">
+
+		</div>
+
+		<script src="../js/mui.min.js"></script>
+		<script src="../js/app.js" type="text/javascript" charset="utf-8"></script>
+		<script>
+			var userId; //用户ID
+			var userName; //用户名
+			var departmentId; //部门ID
+			var currentTime; //签到时间年月日
+			var startTime; //上班时间
+			var endTime; //下班时间
+			var workTime; //签到时间
+			var site = ""; //打卡地点
+			var out; //外勤 0本地 1外勤
+			var outReason = ""; //外勤理由
+			var choose; //0上班1请假(半)2旷工3事假4出差5不上班(休息日加班)
+			var overTime = ""; //加班开始时间
+			var groupName = ""; //分组名称
+			var phoneUUID = ""; //获取手机标识 当前手机
+			var phoneId = ""; //手机唯一名称  数据库
+			var phoneName = ""; //手机详细信息 
+			var btnText = ""; //按钮显示的内容
+			//以下为定位信息操作
+			var groupConter; //中心点坐标
+			var radius; //半径
+			var conterPlace = {}; //解析后的中心点坐标
+			var place = {} //考勤人员坐标
+			//考勤状态 1正常  2外勤  3 禁止打卡
+			var condition = 0; //0打卡 1不可以打卡 如要拍照打卡
+			var filename = "" //文件名称
+
+			var openIndex = 0; //0为未进入页面  1为进入页面
+
+			mui.init({
+				beforeback:function(){
+					openIndex=0;
+					return true;
+				}
+			})
+			mui.plusReady(function() {
+				phoneName = plus.device.vendor + "," + plus.device.model;
+				phoneUUID = plus.device.uuid;
+				//打卡界面进入
+				var mapInfoPage = null;
+				$(document).on('tap', '#clickMapInfoShow', function(event) {
+					var settings = app.getSettings();
+					if(!settings.network) {
+						mui.alert("网络异常，请检查您的手机网络是否通畅");
+						return;
+					}
+					if(!mapInfoPage) {
+						mapInfoPage = plus.webview.getWebviewById('mapInfo');
+					};
+
+					mui.fire(mapInfoPage, 'refresh', {
+						"groupConter": groupConter,
+						"radius": radius,
+					});
+					mui.openWindow({
+						id: 'mapInfo',
+						show: {
+							aniShow: 'pop-in'
+						},
+						styles: {
+							popGesture: 'hide'
+						},
+						waiting: {
+							autoShow: false
+						}
+					});
+				});
+			})
+
+			//获取手机时间
+			function getNowTime() {
+				var myDate = new Date();
+				var YY = myDate.getFullYear();
+				var MM = myDate.getMonth();
+				var DD = myDate.getDate();
+				var WW = myDate.getDay();
+				var hh = myDate.getHours();
+				var mm = myDate.getMinutes();
+				var ss = myDate.getSeconds();
+				var phoneTime = {};
+				phoneTime.YY = YY;
+				if(MM + 1 < 10) {
+					phoneTime.MM = "0" + (MM + 1);
+				} else {
+					phoneTime.MM = MM + 1;
+				}
+				if(DD < 10) {
+					phoneTime.DD = "0" + DD;
+				} else {
+					phoneTime.DD = DD;
+				}
+				phoneTime.WW = WW;
+				phoneTime.hh = hh;
+				phoneTime.mm = mm;
+				phoneTime.ss = ss;
+
+				return phoneTime;
+			}
+
+			// 拍照
+			function captureImage() {
+				var cmr = plus.camera.getCamera();
+				var res = cmr.supportedImageResolutions[0];
+				var fmt = cmr.supportedImageFormats[0];
+				cmr.captureImage(function(path) {
+						phonePath = path;
+					},
+					function(error) {
+						mui.alert("未获取到照片数据");
+					}, {
+						resolution: res,
+						format: fmt
+					}
+				);
+			}
+
+			//			refresh();
+			window.addEventListener('refresh', function(event) {
+				refresh();
+
+			})
+
+			mui.plusReady(function() {
+				//执行定时
+				clearInterval(getIsInfo);
+				var ptObj = new plus.maps.Map('map');
+				//定时3秒
+				var getIsInfo = setInterval(function() {
+					if(openIndex == 1) {
+						ptObj.getUserLocation(function(state, point) {
+							if(0 == state) {
+								if(point.longitude == "5e-324" || point.latitude == "5e-324") {
+										mui.alert('请授权本app定位权限');
+										openIndex = 0;
+										mui.back();
+								}
+								place.longitude = point.longitude;
+								place.latitude = point.latitude;
+								//两个坐标获得距离  距离小半径就能打卡
+								var point1 = new plus.maps.Point(conterPlace.longitude, conterPlace.latitude);
+								var point2 = new plus.maps.Point(place.longitude, place.latitude);
+								plus.maps.Map.calculateDistance(point1, point2, function(event) {
+									var distance = event.distance; // 转换后的距离值
+									//大于半径外勤 小于正常
+									if(distance <= radius) {
+										out = 0;
+										$('#clickDoMap').css({
+											background: 'dodgerblue'
+										})
+										$('#clickDoMap').html(btnText);
+										$("#clickStatus").html('已进入考勤范围<br><a id="clickMapInfoShow" href="#">查看考勤范围</a>');
+									} else {
+										out = 1
+										$('#clickDoMap').css({
+											background: '#32cf96'
+										})
+										$('#clickDoMap').html('外勤打卡');
+										$("#clickStatus").html('不在考勤范围内<br><a id="clickMapInfoShow" href="#">查看考勤范围</a>');
+									}
+								}, function(e) {});
+							} else {
+								mui.alert('获取地址失败,请联系管理员');
+								mui.back();
+							}
+						});
+					}
+				}, 3000)
+			})
+			//重置页面
+			function refresh() {
+				openIndex = 1;
+				$("#userName,#userGroup,#sleep,#startTime,#startWorkTime,#startSite,#startDomap,#endTime,#endWorkTime,#endSite,#endDomap,#clickDoMap,#clickStatus").html("")
+				var state = app.getState();
+				var settings = app.getSettings();
+				userName = state.data.userName;
+				$.post(settings.URL + '/rs/android/domap/login', {
+					userId: state.data.userId
+				}, function(info) {
+					if(info.code == 200) {
+						//工作日打卡
+						var data = info.data;
+						//比对系统时间和手机是否接近
+						var nowTime = info.nowTime;
+						var nowTimeArr = nowTime.split(","); //0为年月日  1为时分秒计算和
+						var phoneTime = getNowTime();
+						var phoneDate = phoneTime.YY + '-' + phoneTime.MM + '-' + phoneTime.DD;
+
+						if(nowTimeArr[0] == phoneDate) {
+							var phoneTimeNum = phoneTime.hh * 3600 + phoneTime.mm * 60 + phoneTime.ss;
+							if(parseInt(nowTimeArr[1]) - phoneTimeNum >= 180 || parseInt(nowTimeArr[1]) - phoneTimeNum <= -180) {
+								mui.alert('您的手机时间与系统时间差距过大，请校对后再试!!!');
+								//前台传数据是h*3600+m*60+s 数字  数字比较是否差距过大
+								mui.back();
+								return;
+							}
+						} else {
+							mui.alert('您的手机时间与系统时间差距过大，请校对后再试!!!');
+							mui.back();
+						}
+						departmentId = data.departmentId;
+						phoneId = data.phoneId;
+						//判断是否为同事打卡
+						$.post(settings.URL + "/rs/android/domap/phoneId", {
+							userId: state.data.userId,
+							phoneId: phoneUUID
+						}, function(info) {
+							code = info.code;
+							if(code == 200) {
+								data = info.data;
+								if(data == 1) {
+									condition = 1;
+								}
+							} else {
+								mui.alert('存在未知错误，请重试！');
+								mui.back();
+							}
+						})
+						//							}
+						//						}
+						var group = data.group;
+						choose = info.choose;
+						groupName = group.groupName;
+						site = group.centerSite;
+						overTime = group.overTime;
+						groupConter = group.groupConter;
+						radius = group.radius;
+						startTime = group.startTime;
+						endTime = group.endTime;
+						//处理数据 拆分坐标
+						var groupConterArr = groupConter.split(",");
+						conterPlace.longitude = groupConterArr[0];
+						conterPlace.latitude = groupConterArr[1];
+
+						$("#userName").html(userName);
+						$("#userGroup").html("考勤组： " + groupName);
+						var infoToday = data.infoToday; //当天的考勤数据
+						if(infoToday == "400") {
+							btnText = '上班打卡';
+							$("#startTime").html("上班时间  " + startTime);
+							$("#startDomap").html("<div id='clickDoMap'class='clickDoMap move1'>定位中</div>")
+							$("#endTime").html("下班时间  " + endTime);
+						} else {
+							btnText = '下班打卡';
+							startWorkTime = infoToday.startWorkTime;
+							endWorkTime = infoToday.endWorkTime;
+							startSite = infoToday.startSite;
+							endSite = infoToday.endSite;
+							$("#startTime").html("上班时间  " + startTime);
+							$("#startWorkTime").html("打卡时间  " + startWorkTime);
+							$("#startSite").html("打卡地点  " + startSite);
+							$("#endTime").html("下班打卡  " + endTime);
+							if(endWorkTime) {
+								$("#endWorkTime").html("打卡时间  " + endWorkTime);
+								$("#endSite").html("打卡地点  " + endSite);
+								btnText = '更新打卡';
+							}
+							$("#endTime").html("下班时间  " + endTime);
+							$("#endDomap").html("<div id='clickDoMap'class='clickDoMap move1'>定位中</div>")
+							//然后执行那个定位操作
+						}
+
+					} else if(info.code == 300) {
+						//休息日打卡
+						//						$("#sleep").html("你今天休息");
+						var data = info.data;
+						//比对系统时间和手机是否接近
+						var nowTime = info.nowTime;
+						var nowTimeArr = nowTime.split(","); //0为年月日  1为时分秒计算和
+						var phoneTime = getNowTime();
+						var phoneDate = phoneTime.YY + '-' + phoneTime.MM + '-' + phoneTime.DD;
+						if(nowTimeArr[0] == phoneDate) {
+							var phoneTimeNum = phoneTime.hh * 3600 + phoneTime.mm * 60 + phoneTime.ss;
+							if(parseInt(nowTimeArr[1]) - phoneTimeNum >= 180 || parseInt(nowTimeArr[1]) - phoneTimeNum <= -180) {
+								mui.alert('您的手机时间与系统时间差距过大，请校对后再试!!!');
+								//前台传数据是h*3600+m*60+s 数字  数字比较是否差距过大
+								mui.back();
+								return;
+							}
+						} else {
+							mui.alert('您的手机时间与系统时间差距过大，请校对后再试!!!');
+							mui.back();
+						}
+						departmentId = data.departmentId;
+						phoneId = data.phoneId;
+						//判断是否为同事打卡
+						$.post(settings.URL + "/rs/android/domap/phoneId", {
+							userId: state.data.userId,
+							phoneId: phoneUUID
+						}, function(info) {
+							code = info.code;
+							if(code == 200) {
+								data = info.data;
+								if(data == 1) {
+									condition = 1;
+								}
+							} else {
+								mui.alert('存在未知错误，请重试！');
+								mui.back();
+							}
+						})
+						//							}
+						//						}
+						choose = info.choose;
+						var group = data.group;
+						groupName = group.groupName;
+						site = group.centerSite;
+						overTime = group.overTime;
+						groupConter = group.groupConter;
+						radius = group.radius;
+						startTime = group.startTime;
+						endTime = group.endTime;
+						var infoToday = data.infoToday;
+						//处理数据 拆分坐标
+						var groupConterArr = groupConter.split(",");
+						conterPlace.longitude = groupConterArr[0];
+						conterPlace.latitude = groupConterArr[1];
+
+						$("#userName").html(userName);
+						$("#userGroup").html("考勤组: " + groupName);
+						if(infoToday == "400") {
+							btnText = '上班打卡';
+							$("#startTime").html("上班打卡  ");
+							$("#startDomap").html("<div id='clickDoMap'class='clickDoMap'>定位中</div>")
+						} else {
+							btnText = '下班打卡';
+							startWorkTime = infoToday.startWorkTime;
+							endWorkTime = infoToday.endWorkTime;
+							startSite = infoToday.startSite;
+							endSite = infoToday.endSite;
+							$("#startTime").html("上班打卡  ");
+							$("#startWorkTime").html("打卡时间  " + startWorkTime);
+							$("#startSite").html("打卡地点  " + startSite);
+							$("#endTime").html("下班打卡  ");
+							if(endWorkTime) {
+								$("#endWorkTime").html("打卡时间  " + endWorkTime);
+								$("#endSite").html("打卡地点  " + endSite);
+								btnText = '更新打卡';
+							}
+							$("#endDomap").html("<div id='clickDoMap'class='clickDoMap'>定位中</div>")
+						}
+					} else if(info.code == 500) {
+						//不参与考勤的人
+						mui.alert('您不需要参与考勤打卡！');
+						mui.back();
+					} else {
+						mui.alert('存在未知错误，请重试！');
+						mui.back();
+					}
+				})
+			}
+
+			//点击打卡触发事件
+			$(document).on('tap', '#clickDoMap', function() {
+				var settings = app.getSettings();
+				if(!settings.network) {
+					mui.alert("网络异常，请检查您的手机网络是否通畅");
+					return;
+				}
+				//这里比较里面#clickDoMap 判断是不是处于定时函数未触发时期   这里没想好判断方式  现用定位中判定  以后如果改其中文字后要注意这里
+				if($("#clickDoMap").html() != "定位中") {
+					var state = app.getState();
+					var settings = app.getSettings();
+					var nowTime = getNowTime();
+
+					//修改时间  补齐时间  如 8  改成08
+					if(nowTime.hh < 10) {
+						nowTime.hh = "0" + nowTime.hh
+					}
+					if(nowTime.mm < 10) {
+						nowTime.mm = "0" + nowTime.mm
+					}
+					var dataNowDate = nowTime.YY + '-' + nowTime.MM + '-' + nowTime.DD;
+					var dataNowTime = nowTime.hh + ':' + nowTime.mm;
+
+					if(!startTime) {
+						startTime = "";
+					}
+					if(!endTime) {
+						endTime = "";
+					}
+					if(!site) {
+						site = "";
+					} //可以打卡
+					if(condition == 0) {
+						//外勤打卡 1
+						if(out == 1) {
+							function getGeocode() {
+								//外勤弹出框
+								function showPrompt() {
+									var bts = ["确认", "取消"];
+									plus.nativeUI.prompt("  ", function(e) {
+										//0为确认
+										if(e.index == 0) {
+											outReason = e.value;
+											if(outReason.length <= 400) {
+												plus.geolocation.getCurrentPosition(function(sites) {
+													$.post(settings.URL + '/rs/android/domap/save', {
+														userId: state.data.userId,
+														userName: state.data.userName,
+														departmentId: departmentId,
+														currentTime: dataNowDate,
+														startTime: startTime,
+														endTime: endTime,
+														workTime: dataNowTime,
+														site: sites.addresses,
+														out: out,
+														outReason: outReason,
+														choose: choose,
+														overTime: overTime,
+														groupName: groupName,
+														phoneId: phoneUUID,
+														phoneName: phoneName,
+														filename: filename
+													}, function(result) {
+														if(result.code == 200) {
+															mui.alert("打卡成功")
+															if($("#startDomap").html() != "") {
+																$("#startDomap").html("");
+															}
+															refresh()
+														} else {
+															mui.alert("打卡失败,请重试")
+														}
+													})
+												}, {
+													geocode: true
+												});
+											}
+										}
+									}, "请输入外勤理由", "  ", bts);
+								}
+								showPrompt();
+							}
+							getGeocode();
+						} else {
+							//本地打卡
+							$.post(settings.URL + '/rs/android/domap/save', {
+								userId: state.data.userId,
+								userName: state.data.userName,
+								departmentId: departmentId,
+								currentTime: dataNowDate,
+								startTime: startTime,
+								endTime: endTime,
+								workTime: dataNowTime,
+								site: site,
+								out: out,
+								outReason: outReason,
+								choose: choose,
+								overTime: overTime,
+								groupName: groupName,
+								phoneId: phoneUUID,
+								phoneName: phoneName,
+								filename: filename
+							}, function(result) {
+								if(result.code == 200) {
+									mui.alert("打卡成功")
+									if($("#startDomap").html() != "") {
+										$("#startDomap").html("");
+									}
+									refresh()
+								} else {
+									mui.alert("打卡失败,请重试")
+								}
+							})
+						}
+						//需要拍照才能打卡
+					} else if(condition == 1) {
+						showAlert()
+
+						function showAlert() {
+							plus.nativeUI.alert("检测您手机异常,需要拍照后才能打卡", function(e) {
+								if(out == 1) {
+									showPrompt();
+
+									function showPrompt() {
+										var bts = ["确认", "取消"];
+										plus.nativeUI.prompt("  ", function(e) {
+											//0为确定
+											if(e.index == 0) {
+												outReason = e.value;
+												if(outReason.length < 400) {
+													captureImage()
+
+													function captureImage() {
+														var cmr = plus.camera.getCamera();
+														var res = cmr.supportedImageResolutions[0];
+														var fmt = cmr.supportedImageFormats[0];
+														cmr.captureImage(function(path) {
+															mui.alert("照片上传中,请不要退出当前界面...")
+															// 创建上传任务
+															var task = plus.uploader.createUpload(settings.URL + '/uploadFileController/uploadFile.do', {
+																	method: "POST"
+																},
+																function(result) { //上传完成
+																	var ret = JSON.parse(result.responseText)
+																	if(ret.code == 200) {
+																		filename = ret.data
+																		plus.geolocation.getCurrentPosition(function(sites) {
+																			$.post(settings.URL + '/rs/android/domap/save', {
+																				userId: state.data.userId,
+																				userName: state.data.userName,
+																				departmentId: departmentId,
+																				currentTime: dataNowDate,
+																				startTime: startTime,
+																				endTime: endTime,
+																				workTime: dataNowTime,
+																				site: sites.addresses,
+																				out: out,
+																				outReason: outReason,
+																				choose: choose,
+																				overTime: overTime,
+																				phoneName: phoneName,
+																				groupName: groupName,
+																				phoneId: phoneUUID,
+																				phoneName: phoneName,
+																				filename: filename
+																			}, function(result) {
+																				if(result.code == 200) {
+																					mui.alert("打卡成功")
+																					if($("#startDomap").html() != "") {
+																						$("#startDomap").html("");
+																					}
+																					filename = "";
+																					condition = 0;
+																					refresh();
+																				} else {
+																					mui.alert("打卡失败,请重新打卡")
+																				}
+																			})
+																		}, {
+																			geocode: true
+																		});
+
+																	} else {
+																		mui.alert("上传照片失败,请重试");
+																	}
+																});
+															//添加其他参数  文件上传
+															task.addFile(path, {
+																key: "data"
+															});
+															task.start();
+														})
+													};
+												} else {
+													mui.alert("文字数量超过500,请重新输入");
+												}
+											}
+										}, "请输入外勤理由", "  ", bts);
+									}
+								} else {
+									captureImage();
+
+									function captureImage() {
+										var cmr = plus.camera.getCamera();
+										var res = cmr.supportedImageResolutions[0];
+										var fmt = cmr.supportedImageFormats[0];
+										cmr.captureImage(function(path) {
+											mui.alert("照片上传中,请不要退出当前界面...")
+											// 创建上传任务
+											var task = plus.uploader.createUpload(settings.URL + '/uploadFileController/uploadFile.do', {
+													method: "POST"
+												},
+												function(result) {
+													var ret = JSON.parse(result.responseText)
+													if(ret.code == 200) {
+														filename = ret.data
+														$.post(settings.URL + '/rs/android/domap/save', {
+															userId: state.data.userId,
+															userName: state.data.userName,
+															departmentId: departmentId,
+															currentTime: dataNowDate,
+															startTime: startTime,
+															endTime: endTime,
+															workTime: dataNowTime,
+															site: site,
+															out: out,
+															outReason: outReason,
+															choose: choose,
+															phoneName: phoneName,
+															overTime: overTime,
+															groupName: groupName,
+															phoneId: phoneUUID,
+															filename: filename
+														}, function(result) {
+															if(result.code == 200) {
+																mui.alert("打卡成功")
+																if($("#startDomap").html() != "") {
+																	$("#startDomap").html("");
+																}
+																filename = "";
+																condition = 0;
+																refresh();
+															} else {
+																mui.alert("打卡失败,请重试")
+															}
+														})
+													} else {
+														mui.alert("上传照片失败,请重试");
+													}
+												});
+											//添加其他参数
+											task.addFile(path, {
+												key: "data"
+											});
+											task.start();
+										})
+									};
+								}
+							}, "提示", "确定");
+						}
+					} else {
+						//不执行打卡操作
+					}
+				}
+			})
+		</script>
+	</body>
+
+</html>

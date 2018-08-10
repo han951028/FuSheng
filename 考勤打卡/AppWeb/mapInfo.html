@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+
+	<head>
+		<meta charset="utf-8">
+		<title>oaDemo</title>
+		<meta name="viewport" content="width=device-width, initial-scale=1,maximum-scale=1,user-scalable=no">
+		<meta name="apple-mobile-web-app-capable" content="yes">
+		<meta name="apple-mobile-web-app-status-bar-style" content="black">
+		<script type="text/javascript">
+			var htmlTag = document.getElementsByTagName("html")[0];
+			htmlTag.style.fontSize = document.documentElement.clientWidth / 10 + "px";
+		</script>
+
+		<!--标准mui.css-->
+		<link rel="stylesheet" href="../css/mui.min.css">
+		<link rel="stylesheet" type="text/css" href="../css/font-awesome.min.css" />
+		<script src="../js/jquery.min.js"></script>
+		<!--App自定义的css-->
+		<!--<link rel="stylesheet" type="text/css" href="../css/app.css" />-->
+		<style>
+			html,
+			body {
+				height: 100%;
+				width: 100%;
+			}
+			
+			body {
+				background: #fff;
+			}
+			header{
+				position: fixed;
+				top: 0;
+				z-index: 999;
+			}
+			#mapInfo {
+				padding-top: 45px;
+				width: 100%;
+				height: 100%;
+			}
+			
+			#map {
+				width: 100%;
+				height: 100%;
+			}
+		</style>
+	</head>
+
+	<body>
+		<header class="mui-bar mui-bar-nav" style="background: #207CD1;color: #fff;">
+			<a class="mui-action-back mui-icon mui-icon-left-nav mui-pull-left" style="color: #fff;"></a>
+			<h1 class="mui-title" style="color: #fff;">我的打卡</h1>
+		</header>
+		<div id="mapInfo" class="domapInfo">
+			<div id="map">
+			</div>
+			<div id="showLoacl">
+
+			</div>
+			<input type="hidden" id="index" value="0" />
+		</div>
+
+		<script src="../js/mui.min.js"></script>
+		<script src="../js/app.js" type="text/javascript" charset="utf-8"></script>
+		<script>
+			var radius //半径
+			var conterLng
+			var conterLat
+			var ws=null,wo=null;
+			var em=null,map=null,point=null;
+			var circleObj ="";
+			var marker="";
+			var index = 0;
+			var watchId;
+			var point1 ;
+			var SHei = window.innerHeight;
+			document.querySelector('#mapInfo').style.height = SHei + 'px';
+			
+			
+			mui.init({
+				beforeback:function(){
+					showUserLocationF();
+					return true;
+				}
+			})
+			
+			window.addEventListener('refresh', function(event) {
+				var groupConter = event.detail.groupConter;
+				radius = event.detail.radius;
+				groupConterArr = groupConter.split(",");
+				conterLng = groupConterArr[0];
+				conterLat = groupConterArr[1];
+				if(window.plus){
+					plusReady();
+					getcircle();
+				}else{
+					document.addEventListener("plusready",plusReady,false);
+					getcircle();
+				}
+			})
+			
+			function getcircle(){
+				if(circleObj!=""){
+				map.removeOverlay(circleObj);	
+				}
+				point = new plus.maps.Point(conterLng, conterLat);
+				circleObj = new plus.maps.Circle(point, radius);
+				//边框颜色
+				circleObj.setStrokeColor("#0078D7");
+				//填充颜色
+				circleObj.setFillColor("#0078D7");
+				//透明度
+				circleObj.setFillOpacity(0.2);
+				//边框宽度
+				circleObj.setLineWidth(2);
+				map.addOverlay(circleObj);
+				map.centerAndZoom(point, 17);
+			}
+			
+		// H5 plus事件处理
+			function plusReady(){
+				if(!em||ws){
+					return};
+				// 获取窗口对象
+				ws=plus.webview.currentWebview();
+				wo=ws.opener();
+				map = new plus.maps.Map("map");
+				map.showUserLocation( true );
+			}
+			
+			
+		// DOMContentloaded事件处理
+		document.addEventListener("DOMContentLoaded", function() {
+			em = document.getElementById("map");
+			if(window.plus){
+				plusReady();				
+			}
+		}, false);
+		
+			function showUserLocationF(){
+				map.showUserLocation( false );
+			}
+		</script>
+	</body>
+
+</html>
